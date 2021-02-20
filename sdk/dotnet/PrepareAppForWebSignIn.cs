@@ -9,29 +9,22 @@ using Pulumi.Serialization;
 
 namespace Pulumi.Xyz
 {
-    public partial class Random : Pulumi.CustomResource
+    public partial class PrepareAppForWebSignIn : Pulumi.CustomResource
     {
-        [Output("length")]
-        public Output<int> Length { get; private set; } = null!;
-
-        [Output("result")]
-        public Output<string> Result { get; private set; } = null!;
-
-
         /// <summary>
-        /// Create a Random resource with the given unique name, arguments, and options.
+        /// Create a PrepareAppForWebSignIn resource with the given unique name, arguments, and options.
         /// </summary>
         ///
         /// <param name="name">The unique name of the resource</param>
         /// <param name="args">The arguments used to populate this resource's properties</param>
         /// <param name="options">A bag of options that control this resource's behavior</param>
-        public Random(string name, RandomArgs args, CustomResourceOptions? options = null)
-            : base("xyz:index:Random", name, args ?? new RandomArgs(), MakeResourceOptions(options, ""))
+        public PrepareAppForWebSignIn(string name, PrepareAppForWebSignInArgs args, CustomResourceOptions? options = null)
+            : base("xyz:index:PrepareAppForWebSignIn", name, args ?? new PrepareAppForWebSignInArgs(), MakeResourceOptions(options, ""))
         {
         }
 
-        private Random(string name, Input<string> id, CustomResourceOptions? options = null)
-            : base("xyz:index:Random", name, null, MakeResourceOptions(options, id))
+        private PrepareAppForWebSignIn(string name, Input<string> id, CustomResourceOptions? options = null)
+            : base("xyz:index:PrepareAppForWebSignIn", name, null, MakeResourceOptions(options, id))
         {
         }
 
@@ -47,25 +40,28 @@ namespace Pulumi.Xyz
             return merged;
         }
         /// <summary>
-        /// Get an existing Random resource's state with the given name, ID, and optional extra
+        /// Get an existing PrepareAppForWebSignIn resource's state with the given name, ID, and optional extra
         /// properties used to qualify the lookup.
         /// </summary>
         ///
         /// <param name="name">The unique name of the resulting resource.</param>
         /// <param name="id">The unique provider ID of the resource to lookup.</param>
         /// <param name="options">A bag of options that control this resource's behavior</param>
-        public static Random Get(string name, Input<string> id, CustomResourceOptions? options = null)
+        public static PrepareAppForWebSignIn Get(string name, Input<string> id, CustomResourceOptions? options = null)
         {
-            return new Random(name, id, options);
+            return new PrepareAppForWebSignIn(name, id, options);
         }
     }
 
-    public sealed class RandomArgs : Pulumi.ResourceArgs
+    public sealed class PrepareAppForWebSignInArgs : Pulumi.ResourceArgs
     {
-        [Input("length", required: true)]
-        public Input<int> Length { get; set; } = null!;
+        [Input("hostName", required: true)]
+        public Input<string> HostName { get; set; } = null!;
 
-        public RandomArgs()
+        [Input("objectId", required: true)]
+        public Input<string> ObjectId { get; set; } = null!;
+
+        public PrepareAppForWebSignInArgs()
         {
         }
     }

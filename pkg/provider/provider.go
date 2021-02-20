@@ -15,14 +15,18 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"math/rand"
+	"os/exec"
+	"regexp"
 	"time"
 
 	"github.com/pulumi/pulumi/pkg/v2/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/resource/plugin"
+	logger "github.com/pulumi/pulumi/sdk/v2/go/common/util/logging"
 	rpc "github.com/pulumi/pulumi/sdk/v2/proto/go"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
@@ -80,9 +84,16 @@ func (k *xyzProvider) StreamInvoke(req *rpc.InvokeRequest, server rpc.ResourcePr
 func (k *xyzProvider) Check(ctx context.Context, req *rpc.CheckRequest) (*rpc.CheckResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
+
+	switch ty {
+
+	case "xyz:index:PrepareAppForWebSignIn":
+
+	default:
+		return nil, fmt.Errorf("Check: unknown resource type '%s'", ty)
+
 	}
+
 	return &rpc.CheckResponse{Inputs: req.News, Failures: nil}, nil
 }
 
@@ -90,9 +101,6 @@ func (k *xyzProvider) Check(ctx context.Context, req *rpc.CheckRequest) (*rpc.Ch
 func (k *xyzProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc.DiffResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
-	}
 
 	olds, err := plugin.UnmarshalProperties(req.GetOlds(), plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true})
 	if err != nil {
@@ -104,49 +112,133 @@ func (k *xyzProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc.Diff
 		return nil, err
 	}
 
-	d := olds.Diff(news)
-	changes := rpc.DiffResponse_DIFF_NONE
-	if d.Changed("length") {
-		changes = rpc.DiffResponse_DIFF_SOME
+	var replaces []string
+	var changes rpc.DiffResponse_DiffChanges
+
+	switch ty {
+
+	case "xyz:index:PrepareAppForWebSignIn":
+		d := olds.Diff(news)
+		if d == nil {
+			changes = rpc.DiffResponse_DIFF_NONE
+			replaces = []string{}
+		} else {
+			if d.Changed("objectId") {
+				changes = rpc.DiffResponse_DIFF_SOME
+				replaces = append(replaces, "objectId")
+			}
+			if d.Changed("hostName") {
+				changes = rpc.DiffResponse_DIFF_SOME
+				replaces = append(replaces, "hostName")
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("Diff: unknown resource type '%s'", ty)
+
 	}
 
 	return &rpc.DiffResponse{
 		Changes:  changes,
-		Replaces: []string{"length"},
+		Replaces: replaces,
 	}, nil
+}
+
+type aadAppUpdateAPI struct {
+	RequestAccessTokenVersion int `json:"requestedAccessTokenVersion"`
+}
+
+type aadAppUpdateWeb struct {
+	HomePageURL  string   `json:"homePageUrl"`
+	RedirectUris []string `json:"redirectUris"`
+	LogoutURL    string   `json:"logoutUrl"`
+}
+
+type aadAppUpdate struct {
+	API            aadAppUpdateAPI `json:"api"`
+	SignInAudience string          `json:"signInAudience"`
+	Web            aadAppUpdateWeb `json:"web"`
 }
 
 // Create allocates a new instance of the provided resource and returns its unique ID afterwards.
 func (k *xyzProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.CreateResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
-	}
 
 	inputs, err := plugin.UnmarshalProperties(req.GetProperties(), plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true})
 	if err != nil {
 		return nil, err
 	}
 
-	if !inputs["length"].IsNumber() {
-		return nil, fmt.Errorf("Expected input property 'length' of type 'number' but got '%s", inputs["length"].TypeString())
-	}
+	var outputs map[string]interface{}
+	var result string
 
-	n := int(inputs["length"].NumberValue())
+	switch ty {
 
-	// Actually "create" the random number
-	result := makeRandom(n)
+	case "xyz:index:PrepareAppForWebSignIn":
+		if !inputs["objectId"].IsString() {
+			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+		}
 
-	outputs := map[string]interface{}{
-		"length": n,
-		"result": result,
+		if !inputs["hostName"].IsString() {
+			return nil, fmt.Errorf("Expected input property 'hostName' of type 'string' but got '%s", inputs["string"].TypeString())
+		}
+
+		objectID := inputs["objectId"].StringValue()
+
+		err = waitForApp(objectID, true)
+
+		if err != nil {
+			return nil, err
+		}
+
+		hostName := inputs["hostName"].StringValue()
+		result = objectID
+
+		jsonBytes, err := json.Marshal(aadAppUpdate{
+			API: aadAppUpdateAPI{
+				RequestAccessTokenVersion: 2,
+			},
+			SignInAudience: "AzureADandPersonalMicrosoftAccount",
+			Web: aadAppUpdateWeb{
+				HomePageURL: fmt.Sprintf("https://%s", hostName),
+				RedirectUris: []string{
+					fmt.Sprintf("https://%s/signin-oidc", hostName),
+				},
+				LogoutURL: fmt.Sprintf("https://%s/signout-oidc", hostName),
+			},
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		err = execute("az", "rest",
+			"--method", "PATCH",
+			"--headers", "Content-Type=application/json",
+			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+			"--body", string(jsonBytes),
+			"--verbose")
+
+		if err != nil {
+			return nil, err
+		}
+
+		outputs = map[string]interface{}{
+			"objectId": objectID,
+			"hostName": hostName,
+		}
+
+	default:
+		return nil, fmt.Errorf("Create: unknown resource type '%s'", ty)
+
 	}
 
 	outputProperties, err := plugin.MarshalProperties(
 		resource.NewPropertyMapFromMap(outputs),
 		plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true},
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -158,24 +250,11 @@ func (k *xyzProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.
 
 // Read the current live state associated with a resource.
 func (k *xyzProvider) Read(ctx context.Context, req *rpc.ReadRequest) (*rpc.ReadResponse, error) {
-	urn := resource.URN(req.GetUrn())
-	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
-	}
-
-	panic("Read not implemented for 'xyz:index:Random'")
+	panic("Read not implemented.")
 }
 
 // Update updates an existing resource with new values.
 func (k *xyzProvider) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
-	urn := resource.URN(req.GetUrn())
-	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
-	}
-
-	// Our Random resource will never be updated - if there is a diff, it will be a replacement.
 	panic("Update not implemented")
 }
 
@@ -184,11 +263,42 @@ func (k *xyzProvider) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.
 func (k *xyzProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (*pbempty.Empty, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
-	if ty != "xyz:index:Random" {
-		return nil, fmt.Errorf("Unknown resource type '%s'", ty)
+
+	inputs, err := plugin.UnmarshalProperties(req.GetProperties(), plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true})
+	if err != nil {
+		return nil, err
 	}
 
-	// Note that for our Random resource, we don't have to do anything on Delete.
+	switch ty {
+
+	case "xyz:index:PrepareAppForWebSignIn":
+		if !inputs["objectId"].IsString() {
+			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+		}
+
+		objectID := inputs["objectId"].StringValue()
+
+		err = execute("az", "rest",
+			"--method", "DELETE",
+			"--headers", "Content-Type=application/json",
+			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+			"--verbose")
+
+		if err != nil {
+			return nil, err
+		}
+
+		err = waitForApp(objectID, false)
+
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("Delete: unknown resource type '%s'", ty)
+
+	}
+
 	return &pbempty.Empty{}, nil
 }
 
@@ -219,13 +329,65 @@ func (k *xyzProvider) Cancel(context.Context, *pbempty.Empty) (*pbempty.Empty, e
 	return &pbempty.Empty{}, nil
 }
 
-func makeRandom(length int) string {
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	charset := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+func waitForApp(objectID string, waitForAvailable bool) error {
 
-	result := make([]rune, length)
-	for i := range result {
-		result[i] = charset[seededRand.Intn(len(charset))]
+	// Poll for the application to become available.
+	attempt := 0
+	for true {
+		attempt++
+
+		err := execute("az", "rest",
+			"--method", "GET",
+			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+			"--query", "id")
+
+		notFound := false
+
+		if err != nil {
+			matches, regexpErr := regexp.MatchString("(?i)Not ?Found", err.Error())
+			// If the command returned and error and it was not a 404, fail.
+			if regexpErr != nil && !matches {
+				return err
+			}
+
+			notFound = true
+		}
+
+		if waitForAvailable != notFound {
+			return nil
+		}
+
+		if attempt < 30 {
+			time.Sleep(1 * time.Second)
+		} else if err != nil {
+			return err
+		} else {
+			break
+		}
 	}
-	return string(result)
+
+	return fmt.Errorf("application with object ID %s could not be found", objectID)
+}
+
+func execute(name string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+
+	logger.V(9).Infof("Executing command: %v", cmd.Args)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	logger.V(9).Infof("stdout: %v", stdout.String())
+	logger.V(9).Infof("stderr: %v", stderr.String())
+
+	if err != nil {
+		logger.V(9).Infof("err: %v", err)
+		err = fmt.Errorf("%s failed with %v\n%v", name, err, stderr.String())
+	}
+
+	return err
 }

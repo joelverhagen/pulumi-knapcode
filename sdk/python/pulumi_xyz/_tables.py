@@ -3,7 +3,11 @@
 # *** Do not edit by hand unless you're certain you know what you are doing! ***
 
 SNAKE_TO_CAMEL_CASE_TABLE = {
+    "host_name": "hostName",
+    "object_id": "objectId",
 }
 
 CAMEL_TO_SNAKE_CASE_TABLE = {
+    "hostName": "host_name",
+    "objectId": "object_id",
 }
