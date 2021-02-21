@@ -49,3 +49,10 @@ dotnet build (Join-Path $sdk "dotnet\Pulumi.Knapcode.csproj") `
     "/p:Version=$version" `
     "/p:PackageOutputDir=$artifacts" `
     -c $Configuration
+
+Write-Host ""
+Write-Host "Compressing provider plugin..."
+tar -C $artifacts `
+    -cvzf `
+    (Join-Path $artifacts "pulumi-resource-knapcode-v$version-windows-amd64.tar.gz") `
+    "pulumi-resource-knapcode.exe"
