@@ -173,7 +173,7 @@ PS> az rest `
 - The best practices for distribution are unclear. I thought NuGet for the SDK and binaries in the GitHub release for
   the Go plug-in was good enough.
 
-- It's not clear to me how to namespace or branch my custom provider. Using the boilerplate, I was unsure how to get the
+- It's not clear to me how to namespace or brand my custom provider. Using the boilerplate, I was unsure how to get the
   SDK-generation tool to NOT prefix my .csproj with "Pulumi." ([source](https://github.com/pulumi/pulumi/blob/5f4e687a1d73b3f806abe47762e95901ae9a6900/pkg/codegen/dotnet/gen.go#L1923)). I'm not thrilled that I have published my NuGet package in the "Pulumi" namespace.
 
 - It seems like too much work to write the Pulumi plug-in in anything but Go. I tried writing it with a C# ASP.NET Core
