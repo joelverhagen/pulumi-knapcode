@@ -32,7 +32,7 @@ import (
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 )
 
-type xyzProvider struct {
+type knapcodeProvider struct {
 	host    *provider.HostClient
 	name    string
 	version string
@@ -40,7 +40,7 @@ type xyzProvider struct {
 
 func makeProvider(host *provider.HostClient, name, version string) (rpc.ResourceProviderServer, error) {
 	// Return the new provider
-	return &xyzProvider{
+	return &knapcodeProvider{
 		host:    host,
 		name:    name,
 		version: version,
@@ -48,29 +48,29 @@ func makeProvider(host *provider.HostClient, name, version string) (rpc.Resource
 }
 
 // CheckConfig validates the configuration for this provider.
-func (k *xyzProvider) CheckConfig(ctx context.Context, req *rpc.CheckRequest) (*rpc.CheckResponse, error) {
+func (k *knapcodeProvider) CheckConfig(ctx context.Context, req *rpc.CheckRequest) (*rpc.CheckResponse, error) {
 	return &rpc.CheckResponse{Inputs: req.GetNews()}, nil
 }
 
 // DiffConfig diffs the configuration for this provider.
-func (k *xyzProvider) DiffConfig(ctx context.Context, req *rpc.DiffRequest) (*rpc.DiffResponse, error) {
+func (k *knapcodeProvider) DiffConfig(ctx context.Context, req *rpc.DiffRequest) (*rpc.DiffResponse, error) {
 	return &rpc.DiffResponse{}, nil
 }
 
 // Configure configures the resource provider with "globals" that control its behavior.
-func (k *xyzProvider) Configure(_ context.Context, req *rpc.ConfigureRequest) (*rpc.ConfigureResponse, error) {
+func (k *knapcodeProvider) Configure(_ context.Context, req *rpc.ConfigureRequest) (*rpc.ConfigureResponse, error) {
 	return &rpc.ConfigureResponse{}, nil
 }
 
 // Invoke dynamically executes a built-in function in the provider.
-func (k *xyzProvider) Invoke(_ context.Context, req *rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
+func (k *knapcodeProvider) Invoke(_ context.Context, req *rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	tok := req.GetTok()
 	return nil, fmt.Errorf("Unknown Invoke token '%s'", tok)
 }
 
 // StreamInvoke dynamically executes a built-in function in the provider. The result is streamed
 // back as a series of messages.
-func (k *xyzProvider) StreamInvoke(req *rpc.InvokeRequest, server rpc.ResourceProvider_StreamInvokeServer) error {
+func (k *knapcodeProvider) StreamInvoke(req *rpc.InvokeRequest, server rpc.ResourceProvider_StreamInvokeServer) error {
 	tok := req.GetTok()
 	return fmt.Errorf("Unknown StreamInvoke token '%s'", tok)
 }
@@ -81,13 +81,13 @@ func (k *xyzProvider) StreamInvoke(req *rpc.InvokeRequest, server rpc.ResourcePr
 // representation of the properties as present in the program inputs. Though this rule is not
 // required for correctness, violations thereof can negatively impact the end-user experience, as
 // the provider inputs are using for detecting and rendering diffs.
-func (k *xyzProvider) Check(ctx context.Context, req *rpc.CheckRequest) (*rpc.CheckResponse, error) {
+func (k *knapcodeProvider) Check(ctx context.Context, req *rpc.CheckRequest) (*rpc.CheckResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
 
 	switch ty {
 
-	case "xyz:index:PrepareAppForWebSignIn":
+	case "knapcode:index:PrepareAppForWebSignIn":
 
 	default:
 		return nil, fmt.Errorf("Check: unknown resource type '%s'", ty)
@@ -98,7 +98,7 @@ func (k *xyzProvider) Check(ctx context.Context, req *rpc.CheckRequest) (*rpc.Ch
 }
 
 // Diff checks what impacts a hypothetical update will have on the resource's properties.
-func (k *xyzProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc.DiffResponse, error) {
+func (k *knapcodeProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc.DiffResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
 
@@ -117,7 +117,7 @@ func (k *xyzProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc.Diff
 
 	switch ty {
 
-	case "xyz:index:PrepareAppForWebSignIn":
+	case "knapcode:index:PrepareAppForWebSignIn":
 		d := olds.Diff(news)
 		if d == nil {
 			changes = rpc.DiffResponse_DIFF_NONE
@@ -161,7 +161,7 @@ type aadAppUpdate struct {
 }
 
 // Create allocates a new instance of the provided resource and returns its unique ID afterwards.
-func (k *xyzProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.CreateResponse, error) {
+func (k *knapcodeProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.CreateResponse, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
 
@@ -175,7 +175,7 @@ func (k *xyzProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.
 
 	switch ty {
 
-	case "xyz:index:PrepareAppForWebSignIn":
+	case "knapcode:index:PrepareAppForWebSignIn":
 		if !inputs["objectId"].IsString() {
 			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
 		}
@@ -249,18 +249,18 @@ func (k *xyzProvider) Create(ctx context.Context, req *rpc.CreateRequest) (*rpc.
 }
 
 // Read the current live state associated with a resource.
-func (k *xyzProvider) Read(ctx context.Context, req *rpc.ReadRequest) (*rpc.ReadResponse, error) {
+func (k *knapcodeProvider) Read(ctx context.Context, req *rpc.ReadRequest) (*rpc.ReadResponse, error) {
 	panic("Read not implemented.")
 }
 
 // Update updates an existing resource with new values.
-func (k *xyzProvider) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
+func (k *knapcodeProvider) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
 	panic("Update not implemented")
 }
 
 // Delete tears down an existing resource with the given ID.  If it fails, the resource is assumed
 // to still exist.
-func (k *xyzProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (*pbempty.Empty, error) {
+func (k *knapcodeProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (*pbempty.Empty, error) {
 	urn := resource.URN(req.GetUrn())
 	ty := urn.Type()
 
@@ -271,7 +271,7 @@ func (k *xyzProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (*pbem
 
 	switch ty {
 
-	case "xyz:index:PrepareAppForWebSignIn":
+	case "knapcode:index:PrepareAppForWebSignIn":
 		if !inputs["objectId"].IsString() {
 			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
 		}
@@ -303,19 +303,19 @@ func (k *xyzProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (*pbem
 }
 
 // Construct creates a new component resource.
-func (k *xyzProvider) Construct(_ context.Context, _ *rpc.ConstructRequest) (*rpc.ConstructResponse, error) {
+func (k *knapcodeProvider) Construct(_ context.Context, _ *rpc.ConstructRequest) (*rpc.ConstructResponse, error) {
 	panic("Construct not implemented")
 }
 
 // GetPluginInfo returns generic information about this plugin, like its version.
-func (k *xyzProvider) GetPluginInfo(context.Context, *pbempty.Empty) (*rpc.PluginInfo, error) {
+func (k *knapcodeProvider) GetPluginInfo(context.Context, *pbempty.Empty) (*rpc.PluginInfo, error) {
 	return &rpc.PluginInfo{
 		Version: k.version,
 	}, nil
 }
 
 // GetSchema returns the JSON-serialized schema for the provider.
-func (k *xyzProvider) GetSchema(ctx context.Context, req *rpc.GetSchemaRequest) (*rpc.GetSchemaResponse, error) {
+func (k *knapcodeProvider) GetSchema(ctx context.Context, req *rpc.GetSchemaRequest) (*rpc.GetSchemaResponse, error) {
 	return &rpc.GetSchemaResponse{}, nil
 }
 
@@ -324,7 +324,7 @@ func (k *xyzProvider) GetSchema(ctx context.Context, req *rpc.GetSchemaRequest) 
 // creation error or an initialization error). Since Cancel is advisory and non-blocking, it is up
 // to the host to decide how long to wait after Cancel is called before (e.g.)
 // hard-closing any gRPC connection.
-func (k *xyzProvider) Cancel(context.Context, *pbempty.Empty) (*pbempty.Empty, error) {
+func (k *knapcodeProvider) Cancel(context.Context, *pbempty.Empty) (*pbempty.Empty, error) {
 	// TODO
 	return &pbempty.Empty{}, nil
 }

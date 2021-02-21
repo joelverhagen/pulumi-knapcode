@@ -5,7 +5,7 @@
 import warnings
 import pulumi
 import pulumi.runtime
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Sequence, Union
 from . import _utilities, _tables
 
 __all__ = ['Provider']
@@ -19,7 +19,7 @@ class Provider(pulumi.ProviderResource):
                  __name__=None,
                  __opts__=None):
         """
-        Create a Xyz resource with the given unique name, props, and options.
+        Create a Knapcode resource with the given unique name, props, and options.
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         """
@@ -41,7 +41,7 @@ class Provider(pulumi.ProviderResource):
             __props__ = dict()
 
         super(Provider, __self__).__init__(
-            'xyz',
+            'knapcode',
             resource_name,
             __props__,
             opts)

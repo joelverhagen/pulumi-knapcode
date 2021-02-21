@@ -5,7 +5,7 @@
 import warnings
 import pulumi
 import pulumi.runtime
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Sequence, Union
 from . import _utilities, _tables
 
 __all__ = ['PrepareAppForWebSignIn']
@@ -42,14 +42,14 @@ class PrepareAppForWebSignIn(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = dict()
 
-            if host_name is None:
+            if host_name is None and not opts.urn:
                 raise TypeError("Missing required property 'host_name'")
             __props__['host_name'] = host_name
-            if object_id is None:
+            if object_id is None and not opts.urn:
                 raise TypeError("Missing required property 'object_id'")
             __props__['object_id'] = object_id
         super(PrepareAppForWebSignIn, __self__).__init__(
-            'xyz:index:PrepareAppForWebSignIn',
+            'knapcode:index:PrepareAppForWebSignIn',
             resource_name,
             __props__,
             opts)

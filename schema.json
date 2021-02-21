@@ -1,8 +1,8 @@
 {
-    "name": "xyz",
+    "name": "knapcode",
     "version": "0.0.1",
     "resources": {
-        "xyz:index:PrepareAppForWebSignIn": {
+        "knapcode:index:PrepareAppForWebSignIn": {
             "inputProperties": {
                 "objectId": {
                     "type": "string"

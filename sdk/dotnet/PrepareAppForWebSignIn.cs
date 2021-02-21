@@ -7,8 +7,9 @@ using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Pulumi.Serialization;
 
-namespace Pulumi.Xyz
+namespace Pulumi.Knapcode
 {
+    [KnapcodeResourceType("knapcode:index:PrepareAppForWebSignIn")]
     public partial class PrepareAppForWebSignIn : Pulumi.CustomResource
     {
         /// <summary>
@@ -19,12 +20,12 @@ namespace Pulumi.Xyz
         /// <param name="args">The arguments used to populate this resource's properties</param>
         /// <param name="options">A bag of options that control this resource's behavior</param>
         public PrepareAppForWebSignIn(string name, PrepareAppForWebSignInArgs args, CustomResourceOptions? options = null)
-            : base("xyz:index:PrepareAppForWebSignIn", name, args ?? new PrepareAppForWebSignInArgs(), MakeResourceOptions(options, ""))
+            : base("knapcode:index:PrepareAppForWebSignIn", name, args ?? new PrepareAppForWebSignInArgs(), MakeResourceOptions(options, ""))
         {
         }
 
         private PrepareAppForWebSignIn(string name, Input<string> id, CustomResourceOptions? options = null)
-            : base("xyz:index:PrepareAppForWebSignIn", name, null, MakeResourceOptions(options, id))
+            : base("knapcode:index:PrepareAppForWebSignIn", name, null, MakeResourceOptions(options, id))
         {
         }
 

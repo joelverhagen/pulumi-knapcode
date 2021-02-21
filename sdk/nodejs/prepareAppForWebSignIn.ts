@@ -18,7 +18,7 @@ export class PrepareAppForWebSignIn extends pulumi.CustomResource {
     }
 
     /** @internal */
-    public static readonly __pulumiType = 'xyz:index:PrepareAppForWebSignIn';
+    public static readonly __pulumiType = 'knapcode:index:PrepareAppForWebSignIn';
 
     /**
      * Returns true if the given object is an instance of PrepareAppForWebSignIn.  This is designed to work even
@@ -41,23 +41,20 @@ export class PrepareAppForWebSignIn extends pulumi.CustomResource {
      */
     constructor(name: string, args: PrepareAppForWebSignInArgs, opts?: pulumi.CustomResourceOptions) {
         let inputs: pulumi.Inputs = {};
-        if (!(opts && opts.id)) {
-            if (!args || args.hostName === undefined) {
+        opts = opts || {};
+        if (!opts.id) {
+            if ((!args || args.hostName === undefined) && !opts.urn) {
                 throw new Error("Missing required property 'hostName'");
             }
-            if (!args || args.objectId === undefined) {
+            if ((!args || args.objectId === undefined) && !opts.urn) {
                 throw new Error("Missing required property 'objectId'");
             }
             inputs["hostName"] = args ? args.hostName : undefined;
             inputs["objectId"] = args ? args.objectId : undefined;
         } else {
         }
-        if (!opts) {
-            opts = {}
-        }
-
         if (!opts.version) {
-            opts.version = utilities.getVersion();
+            opts = pulumi.mergeOptions(opts, { version: utilities.getVersion()});
         }
         super(PrepareAppForWebSignIn.__pulumiType, name, inputs, opts);
     }
