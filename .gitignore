@@ -368,3 +368,4 @@ FodyWeavers.xsd
 **/node_modules/
 Pulumi.*.yaml
 yarn.lock
+/sdk/dotnet/version.txt
