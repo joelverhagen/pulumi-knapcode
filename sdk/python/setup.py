@@ -33,11 +33,14 @@ def readme():
 
 setup(name='pulumi_knapcode',
       version='${VERSION}',
+      description="Custom Pulumi resources, currently just to work around bugs.",
       long_description=readme(),
       long_description_content_type='text/markdown',
       cmdclass={
           'install': InstallPluginCommand,
       },
+      url='https://github.com/joelverhagen/pulumi-knapcode',
+      license='Apache-2.0',
       packages=find_packages(),
       package_data={
           'pulumi_knapcode': [

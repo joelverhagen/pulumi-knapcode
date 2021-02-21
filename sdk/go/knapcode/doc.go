@@ -1,3 +1,3 @@
-// Package knapcode exports types, functions, subpackages for provisioning knapcode resources.
+// Custom Pulumi resources, currently just to work around bugs.
 //
 package knapcode

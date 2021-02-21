@@ -1,6 +1,9 @@
 {
     "name": "knapcode",
     "version": "0.0.1",
+    "homepage": "https://github.com/joelverhagen/pulumi-knapcode",
+    "license": "Apache-2.0",
+    "description": "Custom Pulumi resources, currently just to work around bugs.",
     "resources": {
         "knapcode:index:PrepareAppForWebSignIn": {
             "inputProperties": {
