@@ -14,7 +14,7 @@ dotnet add package Pulumi.Knapcode
 Then install the resource provider plug-in to your local Pulumi environment:
 
 ```console
-pulumi plugin install resource knapcode v0.0.1 --server https://github.com/joelverhagen/pulumi-knapcode/releases/download/v0.0.1
+pulumi plugin install resource knapcode v0.0.3 --server https://github.com/joelverhagen/pulumi-knapcode/releases/download/v0.0.3
 ```
 
 Note that I only have the Windows x64 build right now.
