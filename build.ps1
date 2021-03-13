@@ -47,7 +47,7 @@ Write-Host ""
 Write-Host "Building NuGet package ..."
 dotnet build (Join-Path $sdk "dotnet\Pulumi.Knapcode.csproj") `
     "/p:Version=$version" `
-    "/p:PackageOutputDir=$artifacts" `
+    "/p:PackageOutputPath=$artifacts" `
     -c $Configuration
 
 Write-Host ""
