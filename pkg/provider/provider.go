@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/pulumi/pulumi/pkg/v2/resource/provider"
@@ -65,14 +66,14 @@ func (k *knapcodeProvider) Configure(_ context.Context, req *rpc.ConfigureReques
 // Invoke dynamically executes a built-in function in the provider.
 func (k *knapcodeProvider) Invoke(_ context.Context, req *rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	tok := req.GetTok()
-	return nil, fmt.Errorf("Unknown Invoke token '%s'", tok)
+	return nil, fmt.Errorf("unknown Invoke token '%s'", tok)
 }
 
 // StreamInvoke dynamically executes a built-in function in the provider. The result is streamed
 // back as a series of messages.
 func (k *knapcodeProvider) StreamInvoke(req *rpc.InvokeRequest, server rpc.ResourceProvider_StreamInvokeServer) error {
 	tok := req.GetTok()
-	return fmt.Errorf("Unknown StreamInvoke token '%s'", tok)
+	return fmt.Errorf("unknown StreamInvoke token '%s'", tok)
 }
 
 // Check validates that the given property bag is valid for a resource of the given type and returns
@@ -177,11 +178,11 @@ func (k *knapcodeProvider) Create(ctx context.Context, req *rpc.CreateRequest) (
 
 	case "knapcode:index:PrepareAppForWebSignIn":
 		if !inputs["objectId"].IsString() {
-			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+			return nil, fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
 		}
 
 		if !inputs["hostName"].IsString() {
-			return nil, fmt.Errorf("Expected input property 'hostName' of type 'string' but got '%s", inputs["string"].TypeString())
+			return nil, fmt.Errorf("expected input property 'hostName' of type 'string' but got '%s", inputs["string"].TypeString())
 		}
 
 		objectID := inputs["objectId"].StringValue()
@@ -273,25 +274,36 @@ func (k *knapcodeProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (
 
 	case "knapcode:index:PrepareAppForWebSignIn":
 		if !inputs["objectId"].IsString() {
-			return nil, fmt.Errorf("Expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+			return nil, fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
 		}
 
 		objectID := inputs["objectId"].StringValue()
 
-		err = execute("az", "rest",
-			"--method", "DELETE",
-			"--headers", "Content-Type=application/json",
-			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
-			"--verbose")
-
+		notFound, err := isAppNotFound(objectID)
 		if err != nil {
 			return nil, err
 		}
 
-		err = waitForApp(objectID, false)
+		if !notFound {
+			err = execute("az", "rest",
+				"--method", "DELETE",
+				"--headers", "Content-Type=application/json",
+				"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+				"--verbose")
 
-		if err != nil {
-			return nil, err
+			if err != nil {
+				errStr := err.Error()
+				is404 := strings.Contains(errStr, "Request_ResourceNotFound") && strings.Contains(errStr, "Response status: 404")
+				if !is404 {
+					return nil, err
+				}
+			}
+
+			err = waitForApp(objectID, false)
+
+			if err != nil {
+				return nil, err
+			}
 		}
 
 	default:
@@ -329,28 +341,40 @@ func (k *knapcodeProvider) Cancel(context.Context, *pbempty.Empty) (*pbempty.Emp
 	return &pbempty.Empty{}, nil
 }
 
+func isAppNotFound(objectID string) (bool, error) {
+
+	err := execute("az", "rest",
+		"--method", "GET",
+		"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+		"--query", "id")
+
+	notFound := false
+
+	if err != nil {
+		matches, regexpErr := regexp.MatchString("(?i)Not ?Found", err.Error())
+
+		// If the command returned and error and it was not a 404, fail.
+		if regexpErr != nil && !matches {
+			return false, err
+		}
+
+		notFound = true
+	}
+
+	return notFound, nil
+}
+
 func waitForApp(objectID string, waitForAvailable bool) error {
 
 	// Poll for the application to become available.
 	attempt := 0
-	for true {
+	for {
 		attempt++
 
-		err := execute("az", "rest",
-			"--method", "GET",
-			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
-			"--query", "id")
-
-		notFound := false
+		notFound, err := isAppNotFound(objectID)
 
 		if err != nil {
-			matches, regexpErr := regexp.MatchString("(?i)Not ?Found", err.Error())
-			// If the command returned and error and it was not a 404, fail.
-			if regexpErr != nil && !matches {
-				return err
-			}
-
-			notFound = true
+			return err
 		}
 
 		if waitForAvailable != notFound {
