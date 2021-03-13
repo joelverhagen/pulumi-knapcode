@@ -113,24 +113,21 @@ func (k *knapcodeProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc
 		return nil, err
 	}
 
-	var replaces []string
-	var changes rpc.DiffResponse_DiffChanges
+	diffs := []string{}
+	changes := rpc.DiffResponse_DIFF_NONE
 
 	switch ty {
 
 	case "knapcode:index:PrepareAppForWebSignIn":
 		d := olds.Diff(news)
-		if d == nil {
-			changes = rpc.DiffResponse_DIFF_NONE
-			replaces = []string{}
-		} else {
+		if d != nil {
 			if d.Changed("objectId") {
 				changes = rpc.DiffResponse_DIFF_SOME
-				replaces = append(replaces, "objectId")
+				diffs = append(diffs, "objectId")
 			}
 			if d.Changed("hostName") {
 				changes = rpc.DiffResponse_DIFF_SOME
-				replaces = append(replaces, "hostName")
+				diffs = append(diffs, "hostName")
 			}
 		}
 
@@ -140,8 +137,8 @@ func (k *knapcodeProvider) Diff(ctx context.Context, req *rpc.DiffRequest) (*rpc
 	}
 
 	return &rpc.DiffResponse{
-		Changes:  changes,
-		Replaces: replaces,
+		Changes: changes,
+		Diffs:   diffs,
 	}, nil
 }
 
@@ -177,57 +174,9 @@ func (k *knapcodeProvider) Create(ctx context.Context, req *rpc.CreateRequest) (
 	switch ty {
 
 	case "knapcode:index:PrepareAppForWebSignIn":
-		if !inputs["objectId"].IsString() {
-			return nil, fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
-		}
-
-		if !inputs["hostName"].IsString() {
-			return nil, fmt.Errorf("expected input property 'hostName' of type 'string' but got '%s", inputs["string"].TypeString())
-		}
-
-		objectID := inputs["objectId"].StringValue()
-
-		err = waitForApp(objectID, true)
-
+		result, outputs, err = create(inputs)
 		if err != nil {
 			return nil, err
-		}
-
-		hostName := inputs["hostName"].StringValue()
-		result = objectID
-
-		jsonBytes, err := json.Marshal(aadAppUpdate{
-			API: aadAppUpdateAPI{
-				RequestAccessTokenVersion: 2,
-			},
-			SignInAudience: "AzureADandPersonalMicrosoftAccount",
-			Web: aadAppUpdateWeb{
-				HomePageURL: fmt.Sprintf("https://%s", hostName),
-				RedirectUris: []string{
-					fmt.Sprintf("https://%s/signin-oidc", hostName),
-				},
-				LogoutURL: fmt.Sprintf("https://%s/signout-oidc", hostName),
-			},
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		err = execute("az", "rest",
-			"--method", "PATCH",
-			"--headers", "Content-Type=application/json",
-			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
-			"--body", string(jsonBytes),
-			"--verbose")
-
-		if err != nil {
-			return nil, err
-		}
-
-		outputs = map[string]interface{}{
-			"objectId": objectID,
-			"hostName": hostName,
 		}
 
 	default:
@@ -243,6 +192,7 @@ func (k *knapcodeProvider) Create(ctx context.Context, req *rpc.CreateRequest) (
 	if err != nil {
 		return nil, err
 	}
+
 	return &rpc.CreateResponse{
 		Id:         result,
 		Properties: outputProperties,
@@ -256,7 +206,61 @@ func (k *knapcodeProvider) Read(ctx context.Context, req *rpc.ReadRequest) (*rpc
 
 // Update updates an existing resource with new values.
 func (k *knapcodeProvider) Update(ctx context.Context, req *rpc.UpdateRequest) (*rpc.UpdateResponse, error) {
-	panic("Update not implemented")
+	urn := resource.URN(req.GetUrn())
+	ty := urn.Type()
+
+	olds, err := plugin.UnmarshalProperties(req.GetOlds(), plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true})
+	if err != nil {
+		return nil, err
+	}
+
+	news, err := plugin.UnmarshalProperties(req.GetNews(), plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true})
+	if err != nil {
+		return nil, err
+	}
+
+	var outputs map[string]interface{}
+
+	switch ty {
+
+	case "knapcode:index:PrepareAppForWebSignIn":
+		d := olds.Diff(news)
+		if d != nil {
+			if d.Changed("objectId") {
+				err = delete(olds)
+				if err != nil {
+					return nil, err
+				}
+
+				_, outputs, err = create(news)
+				if err != nil {
+					return nil, err
+				}
+			} else if d.Changed("hostName") {
+				_, outputs, err = create(news)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("Diff: unknown resource type '%s'", ty)
+
+	}
+
+	outputProperties, err := plugin.MarshalProperties(
+		resource.NewPropertyMapFromMap(outputs),
+		plugin.MarshalOptions{KeepUnknowns: true, SkipNulls: true},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &rpc.UpdateResponse{
+		Properties: outputProperties,
+	}, nil
 }
 
 // Delete tears down an existing resource with the given ID.  If it fails, the resource is assumed
@@ -273,37 +277,9 @@ func (k *knapcodeProvider) Delete(ctx context.Context, req *rpc.DeleteRequest) (
 	switch ty {
 
 	case "knapcode:index:PrepareAppForWebSignIn":
-		if !inputs["objectId"].IsString() {
-			return nil, fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
-		}
-
-		objectID := inputs["objectId"].StringValue()
-
-		notFound, err := isAppNotFound(objectID)
+		err = delete(inputs)
 		if err != nil {
 			return nil, err
-		}
-
-		if !notFound {
-			err = execute("az", "rest",
-				"--method", "DELETE",
-				"--headers", "Content-Type=application/json",
-				"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
-				"--verbose")
-
-			if err != nil {
-				errStr := err.Error()
-				is404 := strings.Contains(errStr, "Request_ResourceNotFound") && strings.Contains(errStr, "Response status: 404")
-				if !is404 {
-					return nil, err
-				}
-			}
-
-			err = waitForApp(objectID, false)
-
-			if err != nil {
-				return nil, err
-			}
 		}
 
 	default:
@@ -339,6 +315,100 @@ func (k *knapcodeProvider) GetSchema(ctx context.Context, req *rpc.GetSchemaRequ
 func (k *knapcodeProvider) Cancel(context.Context, *pbempty.Empty) (*pbempty.Empty, error) {
 	// TODO
 	return &pbempty.Empty{}, nil
+}
+
+func create(inputs resource.PropertyMap) (string, map[string]interface{}, error) {
+
+	if !inputs["objectId"].IsString() {
+		return "", nil, fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+	}
+
+	if !inputs["hostName"].IsString() {
+		return "", nil, fmt.Errorf("expected input property 'hostName' of type 'string' but got '%s", inputs["string"].TypeString())
+	}
+
+	objectID := inputs["objectId"].StringValue()
+
+	err := waitForApp(objectID, true)
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	hostName := inputs["hostName"].StringValue()
+
+	jsonBytes, err := json.Marshal(aadAppUpdate{
+		API: aadAppUpdateAPI{
+			RequestAccessTokenVersion: 2,
+		},
+		SignInAudience: "AzureADandPersonalMicrosoftAccount",
+		Web: aadAppUpdateWeb{
+			HomePageURL: fmt.Sprintf("https://%s", hostName),
+			RedirectUris: []string{
+				fmt.Sprintf("https://%s/signin-oidc", hostName),
+			},
+			LogoutURL: fmt.Sprintf("https://%s/signout-oidc", hostName),
+		},
+	})
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	err = execute("az", "rest",
+		"--method", "PATCH",
+		"--headers", "Content-Type=application/json",
+		"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+		"--body", string(jsonBytes),
+		"--verbose")
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	outputs := map[string]interface{}{
+		"objectId": objectID,
+		"hostName": hostName,
+	}
+
+	return objectID, outputs, nil
+}
+
+func delete(inputs resource.PropertyMap) error {
+	if !inputs["objectId"].IsString() {
+		return fmt.Errorf("expected input property 'objectId' of type 'string' but got '%s", inputs["string"].TypeString())
+	}
+
+	objectID := inputs["objectId"].StringValue()
+
+	notFound, err := isAppNotFound(objectID)
+	if err != nil {
+		return err
+	}
+
+	if !notFound {
+		err = execute("az", "rest",
+			"--method", "DELETE",
+			"--headers", "Content-Type=application/json",
+			"--uri", fmt.Sprintf("https://graph.microsoft.com/v1.0/applications/%s", objectID),
+			"--verbose")
+
+		if err != nil {
+			errStr := err.Error()
+			is404 := strings.Contains(errStr, "Request_ResourceNotFound") && strings.Contains(errStr, "Response status: 404")
+			if !is404 {
+				return err
+			}
+		}
+
+		err = waitForApp(objectID, false)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func isAppNotFound(objectID string) (bool, error) {
