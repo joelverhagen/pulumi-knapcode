@@ -38,10 +38,20 @@ while ($output) {
 }
 
 Write-Host ""
-Write-Host "Setting dotnet version.txt..."
+Write-Host "Reading version..."
 $schemaJson = Get-Content $schema | ConvertFrom-Json
 $version = $schemaJson.version
+
+Write-Host ""
+Write-Host "Setting dotnet version.txt..."
 $version | Set-Content (Join-Path $sdk "dotnet\version.txt") -Encoding ASCII
+
+Write-Host ""
+Write-Host "Setting version.go..."
+$versionGoPath = Join-Path $PSScriptRoot "pkg\version\version.go"
+$versionGo = Get-Content $versionGoPath
+$versionGo = $versionGo -replace 'var Version string = "[^"]+"', "var Version string = `"$version`""
+$versionGo | Set-Content $versionGoPath -Encoding ASCII
 
 Write-Host ""
 Write-Host "Building NuGet package ..."
