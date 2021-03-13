@@ -1,6 +1,6 @@
 {
     "name": "knapcode",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "homepage": "https://github.com/joelverhagen/pulumi-knapcode",
     "license": "Apache-2.0",
     "description": "Custom Pulumi resources, currently just to work around bugs.",
